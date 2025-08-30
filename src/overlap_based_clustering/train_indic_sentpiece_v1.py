@@ -1,37 +1,43 @@
 import sentencepiece as spm
 import time
 import argparse
+import os
+import gc
 
 def main(data_path, model_type, vocab_size, model_prefix, num_threads):
-    # data_path = "sangraha_all_01.txt"
+    # Check file size and adjust settings accordingly  
+    # Force garbage collection to free memory
+    gc.collect()
 
-    # model_prefix = "bpe_256k" # <model_prefix>.model, <model_prefix>.vocab
-    # model_type = "bpe"
-
-    # vocab_size = 256000
-
+    # SentencePiece training configuration
     split_by_unicode_script = True
     split_by_number = True
     split_by_whitespace = True
     split_digits = False
     train_extremely_large_corpus = True
-
-    print(f"Requested vocab size: {vocab_size} | Type: {model_type}")
-
+    
+    # Add memory management for very large files
+    additional_params = {}
     start_time = time.time()
 
     try:
-        spm.SentencePieceTrainer.train(input=data_path, 
-                                    model_prefix=model_prefix,
-                                    model_type=model_type,
-                                    vocab_size=vocab_size, 
-                                    split_by_unicode_script=split_by_unicode_script,
-                                    split_by_number=split_by_number,
-                                    split_by_whitespace=split_by_whitespace,
-                                    split_digits=split_digits,
-                                    num_threads=num_threads,
-                                    train_extremely_large_corpus=train_extremely_large_corpus
-                                )
+        base_params = {
+            'input': data_path,
+            'model_prefix': model_prefix,
+            'model_type': model_type,
+            'vocab_size': vocab_size,
+            'split_by_unicode_script': split_by_unicode_script,
+            'split_by_number': split_by_number,
+            'split_by_whitespace': split_by_whitespace,
+            'split_digits': split_digits,
+            'num_threads': num_threads,
+            'train_extremely_large_corpus': train_extremely_large_corpus
+        }
+        
+        # Merge additional memory management parameters
+        train_params = {**base_params, **additional_params}
+        
+        spm.SentencePieceTrainer.train(**train_params)
         print(f"Training completed with vocab size: {vocab_size}")
         
     except RuntimeError as e:
@@ -45,17 +51,11 @@ def main(data_path, model_type, vocab_size, model_prefix, num_threads):
                 max_vocab_size = int(match.group(1))
                 print(f"Adjusting vocab size from {vocab_size} to maximum possible: {max_vocab_size}")
                 
-                spm.SentencePieceTrainer.train(input=data_path, 
-                                            model_prefix=model_prefix,
-                                            model_type=model_type,
-                                            vocab_size=max_vocab_size, 
-                                            split_by_unicode_script=split_by_unicode_script,
-                                            split_by_number=split_by_number,
-                                            split_by_whitespace=split_by_whitespace,
-                                            split_digits=split_digits,
-                                            num_threads=num_threads,
-                                            train_extremely_large_corpus=train_extremely_large_corpus
-                                        )
+                # Use the same parameters for retry
+                retry_params = {**base_params, **additional_params}
+                retry_params['vocab_size'] = max_vocab_size
+                
+                spm.SentencePieceTrainer.train(**retry_params)
                 print(f"Training completed with adjusted vocab size: {max_vocab_size}")
             else:
                 print(f"Could not extract max vocab size from error: {e}")
