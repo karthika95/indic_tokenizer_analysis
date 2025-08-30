@@ -34,22 +34,18 @@ def detect_script(text):
 def to_iso15919(example):
     script = detect_script(example["text"])
     if script:
-        try:
-            example["text"] = transliterate(example["text"], script, sanscript.ISO15919)
-        except Exception:
-            # Skip problematic lines silently
-            pass
+            example["text"] = transliterate(example["text"], script, 'iso')
     return example
 
-src_root = "/home/karthika/saketh/RnD/tokenizer/normalized_01"
-dst_root = "/home/karthika/saketh/RnD/tokenizer/normalized_iso"
+src_root = "/home/karthika/saketh/RnD/tokenizer/normalized_iso_txt"
+dst_root = "/home/karthika/saketh/RnD/tokenizer/normalized_temp"
 
 os.makedirs(dst_root, exist_ok=True)
 
 for dataset_name in os.listdir(src_root):
     src_path = os.path.join(src_root, dataset_name)
-    dst_path = os.path.join(dst_root, dataset_name)
-
+    dst_path = os.path.join(dst_root, f"{dataset_name}.txt")
+    print(dataset_name)
     if not os.path.isdir(src_path):
         continue
     if os.path.exists(dst_path):
@@ -61,7 +57,11 @@ for dataset_name in os.listdir(src_root):
     try:
         dataset = load_from_disk(src_path)
         dataset_iso = dataset.map(to_iso15919)
-        dataset_iso.save_to_disk(dst_path)
+        txt_out_path = dst_path
+        text_col = "text" if "text" in dataset_iso.column_names else dataset_iso.column_names[0]
+        with open(txt_out_path, "w", encoding="utf-8") as f:
+            for record in dataset_iso:
+                f.write(record[text_col] + "\n")
         print(f"✅ Saved converted dataset to {dst_path}")
     except Exception as e:
         print(f"❌ Error processing {dataset_name}: {e}")
